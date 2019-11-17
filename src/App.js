@@ -24,7 +24,7 @@ import { MAPBOX_ACCESS_TOKEN } from "./consts";
 import counters from "./counters.json";
 import "./App.css";
 
-const API_HOST = 'http://10.100.57.184:8080'
+const API_HOST = "http://10.100.57.184:8080";
 const STYLE_PREFIX = "mapbox://styles/uladbohdan";
 export const LIGHT_STYLE = `${STYLE_PREFIX}/ck30op2jk14fd1cmwszi4vksy`;
 
@@ -94,9 +94,9 @@ const BOUNDS_BY_PARK = {
 };
 
 const COORD_BY_PARK = {
-  nuuksio: { lat: 60.249999, lon: 24.5999976},
+  nuuksio: { lat: 60.249999, lon: 24.5999976 },
   pallas: { lat: 68.158889, lon: 24.040278 }
-}
+};
 
 const RED = 0;
 const GREEN = 120;
@@ -125,13 +125,17 @@ function App() {
   const [sunData, setSun] = React.useState(null);
 
   const fetchSun = d => {
-    const {lat, lon} = COORD_BY_PARK[value]
+    const { lat, lon } = COORD_BY_PARK[value];
     axios
-      .get(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${d.format("YYYY-MM-DD")}&formatted=0`)
+      .get(
+        `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${d.format(
+          "YYYY-MM-DD"
+        )}&formatted=0`
+      )
       .then(res => {
         setSun(res.data.results);
-      })
-  }
+      });
+  };
 
   const fetchData = d => {
     setIsLoading(true);
@@ -174,8 +178,6 @@ function App() {
     fetchData(date);
     fetchSun(date);
   };
-
-  console.log('sunData', sunData);
 
   return (
     <div>
@@ -294,12 +296,6 @@ function App() {
               ))}
             </Select>
           </FormControl> */}
-          {sunData && (
-            <div>
-              <p>sunrise: {moment(new Date(sunData.sunrise)).format('HH:mm')}</p>
-              <p>sunset: {moment(new Date(sunData.sunset)).format('HH:mm')}</p>
-            </div>)
-          }
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ fontWeight: 600, marginBottom: "8px" }}>
               Choose day
@@ -352,6 +348,23 @@ function App() {
               max={23}
               disabled={isLoading}
             />
+
+            {sunData && (
+              <div>
+                <p>
+                  <span style={{ fontSize: "24px" }}>🌄</span> Sunrise:{" "}
+                  <span style={{ fontWeight: 600 }}>
+                    {moment(new Date(sunData.sunrise)).format("HH:mm")}
+                  </span>
+                </p>
+                <p>
+                  <span style={{ fontSize: "24px" }}>🌅</span> Sunset:{" "}
+                  <span style={{ fontWeight: 600 }}>
+                    {moment(new Date(sunData.sunset)).format("HH:mm")}
+                  </span>
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </Drawer>
