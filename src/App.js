@@ -1,10 +1,5 @@
-import React from "react";
-import ReactMapboxGl, {
-  Marker,
-  Layer,
-  Feature,
-  ZoomControl
-} from "react-mapbox-gl";
+import React, { useEffect } from "react";
+import ReactMapboxGl, { Marker, ZoomControl } from "react-mapbox-gl";
 import Drawer from "@material-ui/core/Drawer";
 import AppBar from "@material-ui/core/AppBar";
 import Tabs from "@material-ui/core/Tabs";
@@ -13,9 +8,17 @@ import InputLabel from "@material-ui/core/InputLabel";
 import MenuItem from "@material-ui/core/MenuItem";
 import FormControl from "@material-ui/core/FormControl";
 import Select from "@material-ui/core/Select";
+import Slider from "@material-ui/core/Slider";
+import CircularProgress from "@material-ui/core/CircularProgress";
+import Box from "@material-ui/core/Box";
+import { createMuiTheme } from "@material-ui/core/styles";
 import { makeStyles, withStyles } from "@material-ui/core/styles";
-import { DayPickerSingleDateController } from "react-dates";
+import { SingleDatePicker } from "react-dates";
+import axios from "axios";
 import _ from "lodash";
+import "react-dates/initialize";
+import "react-dates/lib/css/_datepicker.css";
+import moment from "moment";
 
 import { MAPBOX_ACCESS_TOKEN } from "./consts";
 import counters from "./counters.json";
@@ -35,16 +38,27 @@ export const FINLAND_BOUNDS = [
   [20.6455928891, 59.846373196]
 ];
 
+const drawerWidth = 350;
+
 const useStyles = makeStyles(theme => ({
+  appBar: {
+    width: `calc(100% - ${drawerWidth}px)`,
+    marginLeft: drawerWidth
+  },
   drawer: {
-    width: 240,
+    width: drawerWidth,
     flexShrink: 0
+  },
+  drawerPaper: {
+    width: drawerWidth
   },
   formControl: {
     margin: theme.spacing(1),
     minWidth: 120
   },
-  test: {}
+  tabs: {
+    backgroundColor: "white"
+  }
 }));
 
 function a11yProps(index) {
@@ -56,8 +70,8 @@ function a11yProps(index) {
 
 const CustomTab = withStyles(theme => ({
   root: {
-    width: 75,
-    fontSize: theme.typography.pxToRem(10)
+    width: 175,
+    fontSize: theme.typography.pxToRem(14)
   }
 }))(props => <Tab disableRipple {...props} />);
 
@@ -74,8 +88,8 @@ const BOUNDS_BY_PARK = {
     [24.570993475020224, 67.54100460419077]
   ],
   nuuksio: [
-    [24.698307563459547, 60.24969716104745],
-    [24.447281862291263, 60.3307308136045]
+    [24.4562897491, 60.2758196349],
+    [24.550391009, 60.3307308136]
   ]
 };
 
@@ -96,10 +110,36 @@ const sizeByPercent = (percent, start = 20, end = 30) => {
 
 function App() {
   const classes = useStyles();
-  const [value, setValue] = React.useState("pallas");
+  const [value, setValue] = React.useState("nuuksio");
   const [timeRange, setTimeRange] = React.useState(TIME_RANGES[0].value);
+  const [date, setDate] = React.useState(moment(new Date(2018, 9, 7)));
+  const [focused, setFocused] = React.useState(false);
+  const [hourRange, setHourRange] = React.useState(14);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [fetchedData, setFetchedData] = React.useState(null);
 
-  const maxVisits = _.maxBy(counters, "value.visits").value.visits;
+  const fetchData = d => {
+    setIsLoading(true);
+    axios
+      .get(`http://10.100.57.184:8080/api/visits/${d.format("YYYY/MM/DD")}`)
+      .then(async function(response) {
+        // handle success
+        console.log(response);
+        setFetchedData(response.data);
+      })
+      .catch(function(error) {
+        // handle error
+        console.log(error);
+      })
+      .finally(function() {
+        // always executed
+        setIsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchData(date);
+  }, []);
 
   const map = React.useRef();
 
@@ -113,50 +153,95 @@ function App() {
     }
   });
 
+  const changeDate = date => {
+    setDate(date);
+    fetchData(date);
+  };
+
   return (
     <div>
-      <Mapbox
-        style={LIGHT_STYLE}
-        containerStyle={{
-          position: "fixed",
-          left: 150,
-          top: 0,
-          bottom: 0,
-          right: 0
-        }}
-        fitBounds={FINLAND_BOUNDS}
-        onSourceDataLoading={m => {
-          if (!map.current) {
-            map.current = m;
-            m.fitBounds(BOUNDS_BY_PARK.pallas, { padding: 20 });
-          }
+      <AppBar position="fixed" className={classes.appBar}>
+        <Mapbox
+          style={LIGHT_STYLE}
+          containerStyle={{
+            position: "fixed",
+            left: 150,
+            top: 0,
+            bottom: 0,
+            right: 0
+          }}
+          fitBounds={FINLAND_BOUNDS}
+          onSourceDataLoading={m => {
+            if (!map.current) {
+              map.current = m;
+              m.fitBounds(BOUNDS_BY_PARK[value], {
+                padding: { left: 170, right: 20, top: 20, bottom: 20 }
+              });
+            }
+          }}
+        >
+          <ZoomControl />
+          {newCounters.map(c => {
+            const visits =
+              fetchedData &&
+              fetchedData.dataByCounters &&
+              fetchedData.dataByCounters[c._id] &&
+              fetchedData.dataByCounters[c._id][hourRange]
+                ? fetchedData.dataByCounters[c._id][hourRange]
+                : 0;
+            const percent = fetchedData
+              ? visits < fetchedData.maxVisits
+                ? (visits * 100) / fetchedData.maxVisits
+                : 100
+              : 0;
+            const size = sizeByPercent(percent);
+            return (
+              <Marker
+                key={c._id}
+                coordinates={[c.long, c.lat]}
+                onClick={() => {
+                  console.log(55, [c.long, c.lat]);
+                }}
+              >
+                <div
+                  style={{
+                    backgroundColor: colorByPercent(percent),
+                    width: size,
+                    height: size,
+                    borderRadius: "50%",
+                    display: "flex",
+                    justifyContent: "center",
+                    alignItems: "center"
+                  }}
+                >
+                  {visits}
+                </div>
+              </Marker>
+            );
+          })}
+        </Mapbox>
+      </AppBar>
+      <Drawer
+        className={classes.drawer}
+        variant="permanent"
+        classes={{
+          paper: classes.drawerPaper
         }}
       >
-        <ZoomControl />
-        {newCounters.map(c => {
-          const percent = (c.value.visits * 100) / maxVisits;
-          const size = sizeByPercent(percent);
-          return (
-            <Marker key={c._id} coordinates={[c.long, c.lat]}>
-              <div
-                style={{
-                  backgroundColor: colorByPercent(percent),
-                  width: size,
-                  height: size,
-                  borderRadius: "50%"
-                }}
-              >{c.value.visits}</div>
-            </Marker>
-          );
-        })}
-      </Mapbox>
-      <Drawer className={classes.drawer} open={true} variant="permanent">
         <AppBar position="static">
+          <Box fontSize="h6.fontSize" m={1}>
+            Choose National Park
+          </Box>
           <Tabs
+            className={classes.tabs}
             value={value}
+            indicatorColor="primary"
+            textColor="primary"
             onChange={(event, newValue) => {
               setValue(newValue);
-              map.current.fitBounds(BOUNDS_BY_PARK[newValue], { padding: 20 });
+              map.current.fitBounds(BOUNDS_BY_PARK[newValue], {
+                padding: { left: 170, right: 20, top: 20, bottom: 20 }
+              });
             }}
           >
             <CustomTab
@@ -171,8 +256,8 @@ function App() {
             />
           </Tabs>
         </AppBar>
-        <div>
-          <FormControl className={classes.formControl}>
+        <div style={{ margin: "16px" }}>
+          {/* <FormControl className={classes.formControl}>
             <InputLabel id="demo-simple-select-label">Time Range</InputLabel>
             <Select
               labelId="demo-simple-select-label"
@@ -188,8 +273,60 @@ function App() {
                 </MenuItem>
               ))}
             </Select>
-          </FormControl>
-          {timeRange === "day" && <DayPickerSingleDateController />}
+          </FormControl> */}
+          <div style={{ display: "flex", flexDirection: "column" }}>
+            <div style={{ fontWeight: 600, marginBottom: "8px" }}>
+              Choose day
+            </div>
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                justifyContent: "space-between"
+              }}
+            >
+              <SingleDatePicker
+                date={date}
+                onDateChange={changeDate}
+                focused={focused}
+                onFocusChange={({ focused }) => {
+                  setFocused(focused);
+                }}
+                id="day-picker"
+                numberOfMonths={1}
+                isOutsideRange={() => false}
+              />
+              {isLoading && <CircularProgress />}
+            </div>
+            <div
+              style={{
+                fontWeight: 600,
+                margin: "16px 0 8px",
+                display: "flex",
+                flexDirection: "row",
+                justifyContent: "space-between"
+              }}
+            >
+              <div>Choose hour</div>
+              <div>{`${hourRange}:00 - ${
+                hourRange === 23 ? 0 : hourRange + 1
+              }:00`}</div>
+            </div>
+            <Slider
+              value={typeof hourRange === "number" ? hourRange : 0}
+              onChange={(event, newValue) => {
+                setHourRange(newValue);
+              }}
+              defaultValue={12}
+              aria-labelledby="discrete-slider"
+              valueLabelDisplay="off"
+              step={1}
+              marks
+              min={0}
+              max={23}
+              disabled={isLoading}
+            />
+          </div>
         </div>
       </Drawer>
     </div>

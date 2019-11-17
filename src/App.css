@@ -20,3 +20,7 @@
 .App-link {
   color: #09d3ac;
 }
+
+.DateInput_input.DateInput_input_1 {
+  box-sizing: border-box;
+}
