@@ -24,8 +24,8 @@ import { MAPBOX_ACCESS_TOKEN } from "./consts";
 import counters from "./counters.json";
 import "./App.css";
 
+const API_HOST = 'http://10.100.57.184:8080'
 const STYLE_PREFIX = "mapbox://styles/uladbohdan";
-
 export const LIGHT_STYLE = `${STYLE_PREFIX}/ck30op2jk14fd1cmwszi4vksy`;
 
 const Mapbox = ReactMapboxGl({
@@ -93,6 +93,11 @@ const BOUNDS_BY_PARK = {
   ]
 };
 
+const COORD_BY_PARK = {
+  nuuksio: { lat: 60.249999, lon: 24.5999976},
+  pallas: { lat: 68.158889, lon: 24.040278 }
+}
+
 const RED = 0;
 const GREEN = 120;
 
@@ -117,11 +122,21 @@ function App() {
   const [hourRange, setHourRange] = React.useState(14);
   const [isLoading, setIsLoading] = React.useState(false);
   const [fetchedData, setFetchedData] = React.useState(null);
+  const [sunData, setSun] = React.useState(null);
+
+  const fetchSun = d => {
+    const {lat, lon} = COORD_BY_PARK[value]
+    axios
+      .get(`https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&date=${d.format("YYYY-MM-DD")}&formatted=0`)
+      .then(res => {
+        setSun(res.data.results);
+      })
+  }
 
   const fetchData = d => {
     setIsLoading(true);
     axios
-      .get(`http://10.100.57.184:8080/api/visits/${d.format("YYYY/MM/DD")}`)
+      .get(`${API_HOST}/api/visits/${d.format("YYYY/MM/DD")}`)
       .then(async function(response) {
         // handle success
         console.log(response);
@@ -139,6 +154,7 @@ function App() {
 
   useEffect(() => {
     fetchData(date);
+    fetchSun(date);
   }, []);
 
   const map = React.useRef();
@@ -156,7 +172,10 @@ function App() {
   const changeDate = date => {
     setDate(date);
     fetchData(date);
+    fetchSun(date);
   };
+
+  console.log('sunData', sunData);
 
   return (
     <div>
@@ -239,6 +258,7 @@ function App() {
             textColor="primary"
             onChange={(event, newValue) => {
               setValue(newValue);
+              fetchSun(date);
               map.current.fitBounds(BOUNDS_BY_PARK[newValue], {
                 padding: { left: 170, right: 20, top: 20, bottom: 20 }
               });
@@ -274,6 +294,12 @@ function App() {
               ))}
             </Select>
           </FormControl> */}
+          {sunData && (
+            <div>
+              <p>sunrise: {moment(new Date(sunData.sunrise)).format('HH:mm')}</p>
+              <p>sunset: {moment(new Date(sunData.sunset)).format('HH:mm')}</p>
+            </div>)
+          }
           <div style={{ display: "flex", flexDirection: "column" }}>
             <div style={{ fontWeight: 600, marginBottom: "8px" }}>
               Choose day
